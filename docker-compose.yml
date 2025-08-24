@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   azurenamingtool:
-    build: .
+    image: azure-naming-tool:latest
     container_name: azure-naming-tool
     ports:
-      - "8080:8080"
+      - "8080:80"
     volumes:
       # Persistent data storage for SQLite database
       - azure-naming-tool-data:/app/data
@@ -22,11 +22,10 @@ services:
       # Application configuration - Set to Development for debugging
       - ASPNETCORE_ENVIRONMENT=Development
       - DOTNET_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
+      - ASPNETCORE_HTTP_PORTS=80
 
       # Use HTTP only for simplicity
-      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_URLS=http://+:80
 
       # Enhanced logging for debugging
       - Logging__LogLevel__Default=Debug
@@ -39,7 +38,7 @@ services:
       
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3

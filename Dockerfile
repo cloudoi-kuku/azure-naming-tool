@@ -22,10 +22,6 @@ ENV StorageSettings__EnableMigration=true
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Install Entity Framework tools for migrations
-RUN dotnet tool install --global dotnet-ef --version 8.0.*
-ENV PATH="$PATH:/root/.dotnet/tools"
-
 COPY ["AzureNamingTool.csproj", "."]
 RUN dotnet restore "./AzureNamingTool.csproj"
 COPY . .
@@ -37,10 +33,6 @@ RUN dotnet publish "AzureNamingTool.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app
-
-# Copy Entity Framework tools to final image
-COPY --from=build /root/.dotnet/tools /root/.dotnet/tools
-ENV PATH="$PATH:/root/.dotnet/tools"
 
 COPY --from=publish /app/publish .
 
@@ -62,27 +54,7 @@ echo "Environment: $ASPNETCORE_ENVIRONMENT"\n\
 echo "Data directory: /app/data"\n\
 echo "Database path: /app/data/azurenamingtool.db"\n\
 \n\
-# Check if Entity Framework tools are available\n\
-if command -v dotnet-ef >/dev/null 2>&1; then\n\
-    echo "Entity Framework tools found"\n\
-    \n\
-    # Run database migrations if database does not exist or if migrations are pending\n\
-    if [ ! -f "/app/data/azurenamingtool.db" ]; then\n\
-        echo "Database not found. Creating database and running migrations..."\n\
-        dotnet ef database update --no-build --verbose || {\n\
-            echo "Migration failed, but continuing with application startup"\n\
-            echo "The application will attempt to create the database at runtime"\n\
-        }\n\
-    else\n\
-        echo "Database exists, checking for pending migrations..."\n\
-        dotnet ef database update --no-build --verbose || {\n\
-            echo "Migration check failed, but continuing with application startup"\n\
-        }\n\
-    fi\n\
-else\n\
-    echo "Entity Framework tools not found, skipping migrations"\n\
-    echo "Database will be created automatically by the application"\n\
-fi\n\
+echo "Database will be created automatically by the application using Entity Framework"\n\
 \n\
 echo "Starting Azure Naming Tool application..."\n\
 # Start the application\n\
