@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  azurenamingtool:
+    build: .
+    container_name: azure-naming-tool
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persistent data storage for SQLite database
+      - azure-naming-tool-data:/app/data
+      # Persistent settings storage
+      - azure-naming-tool-settings:/app/settings
+      # Persistent repository storage (for JSON fallback)
+      - azure-naming-tool-repository:/app/repository
+    environment:
+      # Database configuration
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/azurenamingtool.db
+      - StorageSettings__UseDatabase=true
+      - StorageSettings__EnableMigration=true
+
+      # Application configuration - Set to Development for debugging
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+
+      # Use HTTP only for simplicity
+      - ASPNETCORE_URLS=http://+:8080
+
+      # Enhanced logging for debugging
+      - Logging__LogLevel__Default=Debug
+      - Logging__LogLevel__Microsoft.AspNetCore=Information
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Information
+      - Logging__LogLevel__AzureNamingTool=Debug
+
+      # Development settings
+      - DevMode=true
+      
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  azure-naming-tool-data:
+    driver: local
+  azure-naming-tool-settings:
+    driver: local
+  azure-naming-tool-repository:
+    driver: local

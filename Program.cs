@@ -1,10 +1,15 @@
 using AzureNamingTool.Attributes;
 using AzureNamingTool.Components;
+using AzureNamingTool.Data;
 using AzureNamingTool.Helpers;
+using AzureNamingTool.Interfaces;
 using AzureNamingTool.Models;
+using AzureNamingTool.Repositories;
+using AzureNamingTool.Services;
 using BlazorDownloadFile;
 using Blazored.Modal;
 using Blazored.Toast;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 
@@ -32,6 +37,31 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<StateContainer>();
 
+// Database configuration
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=azurenamingtool.db";
+
+builder.Services.AddDbContext<AzureNamingToolDbContext>(options =>
+{
+    options.UseSqlite(connectionString);
+
+    // Enable detailed errors in development
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableDetailedErrors();
+        options.EnableSensitiveDataLogging();
+    }
+});
+
+// Repository registration
+builder.Services.AddScoped<IGeneratedNamesRepository, GeneratedNamesRepository>();
+
+// Service registration
+builder.Services.AddScoped<GeneratedNamesService>();
+
+// Migration service for data migration
+builder.Services.AddScoped<IDataMigrationService, DataMigrationService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -56,7 +86,72 @@ builder.Services.AddMvcCore().AddApiExplorer();
 
 var app = builder.Build();
 
+// Ensure database is created and migrated
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Initializing database...");
+
+        var context = scope.ServiceProvider.GetRequiredService<AzureNamingToolDbContext>();
+
+        // Ensure database is created
+        var created = await context.Database.EnsureCreatedAsync();
+        if (created)
+        {
+            logger.LogInformation("Database created successfully");
+        }
+        else
+        {
+            logger.LogInformation("Database already exists");
+        }
+
+        // Check if migration service is available and run migration if needed
+        try
+        {
+            var migrationService = scope.ServiceProvider.GetRequiredService<IDataMigrationService>();
+            logger.LogInformation("Running data migration if needed...");
+            await migrationService.MigrateFromJsonIfNeeded();
+            logger.LogInformation("Data migration completed");
+        }
+        catch (Exception migrationEx)
+        {
+            logger.LogWarning(migrationEx, "Data migration failed, but application will continue");
+        }
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "Database initialization failed, but application will continue");
+}
+
 app.MapHealthChecks("/healthcheck/ping");
+app.MapHealthChecks("/health");
+
+// Add a debug endpoint for database status
+app.MapGet("/debug/database", async (AzureNamingToolDbContext context, ILogger<Program> logger) =>
+{
+    try
+    {
+        var canConnect = await context.Database.CanConnectAsync();
+        var generatedNamesCount = await context.GeneratedNames.CountAsync();
+
+        return Results.Ok(new
+        {
+            CanConnect = canConnect,
+            GeneratedNamesCount = generatedNamesCount,
+            DatabasePath = context.Database.GetConnectionString(),
+            Timestamp = DateTime.UtcNow
+        });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Database health check failed");
+        return Results.Problem($"Database error: {ex.Message}");
+    }
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
