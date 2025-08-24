@@ -264,3 +264,23 @@ settings/*.json
 # Temporary files
 *.tmp
 *.temp
+
+# Terraform files
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfvars
+**/.terraform.tfstate.lock.info
+**/crash.log
+**/crash.*.log
+**/*.tfplan
+**/*.tfstate
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# CLI and script files
+scripts/*.log
+scripts/*.tmp
