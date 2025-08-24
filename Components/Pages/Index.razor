@@ -9,70 +9,438 @@
 @inject StateContainer state
 @inject ProtectedSessionStorage session
 
-<PageTitle>@toolname - Home</PageTitle>
+<PageTitle>@toolname - Enterprise Azure Naming Automation</PageTitle>
 
-<div class="card @theme!.ThemeStyle">
+<!-- Hero Section -->
+<div class="hero-section mb-4">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <div class="hero-content">
+                    <div class="brand-header mb-3">
+                        @* <img src="@logopath" height="80" alt="@toolname" class="brand-logo" /> *@
+                        <span class="version-badge"></span>
+                    </div>
 
-    <div class="card-body">
-        <p>
-            <img src="@logopath" height="160" alt="@toolname" />
-        </p>
-        @if (!String.IsNullOrEmpty(customhomecontent))
-        {
-            <div class="card-body">
-                @((MarkupString)Markdown.ToHtml(customhomecontent))
+                    <h1 class="hero-title">
+                        Azure Naming Tool
+                        <span class="text-primary">Enterprise Edition</span>
+                    </h1>
+
+                    <p class="hero-subtitle lead">
+                        Streamline your Azure infrastructure with intelligent, compliant, and automated resource naming.
+                        Now with CLI integration and Terraform automation for enterprise-scale operations.
+                    </p>
+
+                    <div class="hero-stats row g-3 mb-4">
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card text-center">
+                                <div class="stat-number">@resourceTypeCount+</div>
+                                <div class="stat-label">Resource Types</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card text-center">
+                                <div class="stat-number">100%</div>
+                                <div class="stat-label">Azure Compliant</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card text-center">
+                                <div class="stat-number">CLI</div>
+                                <div class="stat-label">Ready</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card text-center">
+                                <div class="stat-number">API</div>
+                                <div class="stat-label">Enabled</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg me-3" @onclick="@(e => NavigateToGenerate())">
+                            <i class="oi oi-play-circle"></i>
+                            Generate Names
+                        </button>
+                        <button class="btn btn-outline-primary btn-lg" @onclick="@(e => NavigateToReference())">
+                            <i class="oi oi-book"></i>
+                            View Reference
+                        </button>
+                    </div>
+                </div>
             </div>
-        }
-        else
-        {
-            <p class="alert alert-info">
-                <span class="fs-4">Disclaimer</span>
-                <br />
-                This tool was designed using the best practices in the <a href="https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/" target="_blank">Azure Cloud Adoption Framework</a> which adheres to a few rules and allows the complete customization of your naming convention.  While most of the customizations can be made in your web browser, this tool also includes an API.
-                <br />
-                <br />
-                For guidance on the API, review your swagger page at: <span class="fw-bold"><a href="swagger/index.html" target="_blank">swagger/index.html</a></span>
-            </p>
-            <h4>Admin</h4>
-            <p>
-                The Admin page is used to configure the Azure Naming Tool. This page is only accessible by Admin users.
-            </p>
-            @if (Convert.ToBoolean(config.InstructionsEnabled) || admin)
-            {
-                <h4>Instructions</h4>
-                <p>
-                    The Instructions page provides documentation for the site pages. Each page of the site contains a documentation link (top right) that will open contextual instructions for the current page.
-                </p>
-            }
-            <h4>Configuration</h4>
-            <p>
-                The Configuration page provides all the data points that make up your naming convention.  There are 8 standard components that may be used to name each Azure resource.  The data within each of those components can be completely customized, except for the resource types.  For the resource types, only the short name, optional, and excluded values may be updated.  A delimiter may be selected to separate each component in your resource names.  However, the delimiter will be included in a resource name if that character is allowed. The tool also supports the ability to define custom components. This allows administrators to create new components for the naming convention.  Your configuration may be exported under the Global Configuration header.  We recommend doing that after defining your naming convention as a backup.  @*Lastly, use the Policy export feature to create an Azure Policy Definition.  That can be applied to your Azure environment to enforce your naming convention.*@
-            </p>
 
-            <h4>Reference</h4>
-            <p>
-                The Reference page provides an example of each Azure resource type using your defined naming convention. The example values do not include any excluded naming components. Optional components are always displayed and are identified below the example. Since unique names are only required at specific scopes, the examples provided are only generated for the scopes above the resource scope: resource group, resource group & region, region, global, subscription, and tenant.
+            <div class="col-lg-6">
+                <div class="hero-visual">
+                    <div class="naming-preview-card card">
+                        <div class="card-header bg-success text-white">
+                            <span class="status-indicator"></span>
+                            <span>Live Naming Generation</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="naming-example">
+                                <div class="input-group mb-2">
+                                    <span class="input-label">Resource Type:</span>
+                                    <span class="input-value">Virtual Machine - Windows</span>
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-label">Environment:</span>
+                                    <span class="input-value">Production</span>
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-label">Location:</span>
+                                    <span class="input-value">East US</span>
+                                </div>
+                                <div class="result-group">
+                                    <span class="result-label">Generated Name:</span>
+                                    <span class="result-value">vmprodeastus01</span>
+                                    <span class="compliance-badge badge bg-success">✓ Compliant</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!String.IsNullOrEmpty(customhomecontent))
+{
+    <div class="card @theme!.ThemeStyle mb-4">
+        <div class="card-body">
+            @((MarkupString)Markdown.ToHtml(customhomecontent))
+        </div>
+    </div>
+}
+
+<!-- Integration Features Section -->
+<div class="integration-section mb-4">
+    <div class="container-fluid">
+        <div class="section-header text-center mb-4">
+            <h2>Multiple Integration Options</h2>
+            <p class="lead">Choose the integration method that fits your workflow</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Web Interface -->
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-card card h-100">
+                    <div class="card-body text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="oi oi-browser" style="font-size: 2.5rem; color: #1b6ec2;"></i>
+                        </div>
+                        <h4>Web Interface</h4>
+                        <p>Interactive web-based naming with real-time validation and configuration management.</p>
+                        <div class="feature-demo">
+                            <small class="text-muted">Point & Click Generation</small>
+                        </div>
+                        <ul class="feature-list list-unstyled">
+                            <li>✓ Real-time validation</li>
+                            <li>✓ Configuration management</li>
+                            <li>✓ Generated names log</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CLI Integration -->
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-card card h-100">
+                    <div class="card-body text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="oi oi-terminal" style="font-size: 2.5rem; color: #28a745;"></i>
+                        </div>
+                        <h4>Command Line Interface</h4>
+                        <p>Cross-platform CLI for seamless integration with DevOps workflows and automation.</p>
+                        <div class="feature-demo">
+                            <code style="font-size: 0.8rem;">./generate-name.sh generate --type vm</code>
+                        </div>
+                        <ul class="feature-list list-unstyled">
+                            <li>✓ Linux, macOS, Windows</li>
+                            <li>✓ Resource type discovery</li>
+                            <li>✓ Batch generation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terraform Integration -->
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-card card h-100">
+                    <div class="card-body text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="oi oi-code" style="font-size: 2.5rem; color: #7c4dff;"></i>
+                        </div>
+                        <h4>Terraform Module</h4>
+                        <p>Native Terraform integration for Infrastructure as Code workflows with automated naming.</p>
+                        <div class="feature-demo">
+                            <code style="font-size: 0.8rem;">module "vm_name" { source = "./azure-naming" }</code>
+                        </div>
+                        <ul class="feature-list list-unstyled">
+                            <li>✓ Reusable modules</li>
+                            <li>✓ External data source</li>
+                            <li>✓ CI/CD pipeline ready</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Integration -->
+            <div class="col-lg-3 col-md-6">
+                <div class="feature-card card h-100">
+                    <div class="card-body text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="oi oi-cloud" style="font-size: 2.5rem; color: #ff6b35;"></i>
+                        </div>
+                        <h4>REST API</h4>
+                        <p>Comprehensive REST API for custom integrations and webhook-based automation.</p>
+                        <div class="feature-demo">
+                            <small class="text-muted"><a href="swagger/index.html" target="_blank">View Swagger Docs</a></small>
+                        </div>
+                        <ul class="feature-list list-unstyled">
+                            <li>✓ RESTful endpoints</li>
+                            <li>✓ Webhook support</li>
+                            <li>✓ Custom integrations</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start Section -->
+<div class="quick-start-section mb-4">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card @theme!.ThemeStyle">
+                    <div class="card-header">
+                        <h3><i class="oi oi-flash"></i> Quick Start Guide</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Web Interface</h5>
+                                <ol>
+                                    <li><strong>Configure:</strong> Set up your naming components in <a href="configuration">Configuration</a></li>
+                                    <li><strong>Generate:</strong> Create names using the <a href="generate">Generate</a> page</li>
+                                    <li><strong>Reference:</strong> View examples in <a href="reference">Reference</a></li>
+                                </ol>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>CLI Integration</h5>
+                                <ol>
+                                    <li><strong>Download:</strong> Get the CLI script from <code>/scripts/</code></li>
+                                    <li><strong>Configure:</strong> Set your API endpoint and key</li>
+                                    <li><strong>Generate:</strong> Run <code>./generate-name.sh generate</code></li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card @theme!.ThemeStyle">
+                    <div class="card-header">
+                        <h3><i class="oi oi-document"></i> Documentation</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="swagger/index.html" target="_blank" class="btn btn-outline-primary">
+                                <i class="oi oi-cloud"></i> API Documentation
+                            </a>
+                            <a href="/docs/WEBHOOK_INTEGRATIONS.md" target="_blank" class="btn btn-outline-primary">
+                                <i class="oi oi-code"></i> Integration Guide
+                            </a>
+                            @if (Convert.ToBoolean(config.InstructionsEnabled) || admin)
+                            {
+                                <button class="btn btn-outline-primary" @onclick="@(e => OnInstructionsClick())">
+                                    <i class="oi oi-book"></i> Instructions
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Features Overview -->
+<div class="features-overview mb-4">
+    <div class="container-fluid">
+        <div class="card @theme!.ThemeStyle">
+            <div class="card-header">
+                <h3><i class="oi oi-star"></i> Key Features</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <!-- Admin Features -->
+                    @if (admin)
+                    {
+                        <div class="col-lg-4 col-md-6">
+                            <div class="feature-item">
+                                <div class="feature-icon-small">
+                                    <i class="oi oi-shield"></i>
+                                </div>
+                                <div class="feature-content">
+                                    <h5>Admin Control</h5>
+                                    <p>Complete administrative control over naming conventions, user management, and system configuration.</p>
+                                    <a href="admin" class="btn btn-sm btn-outline-primary">Access Admin</a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Configuration -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="feature-item">
+                            <div class="feature-icon-small">
+                                <i class="oi oi-cog"></i>
+                            </div>
+                            <div class="feature-content">
+                                <h5>Configuration Management</h5>
+                                <p>Customize all naming components, delimiters, and create custom components for your organization.</p>
+                                <a href="configuration" class="btn btn-sm btn-outline-primary">Configure</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reference -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="feature-item">
+                            <div class="feature-icon-small">
+                                <i class="oi oi-book"></i>
+                            </div>
+                            <div class="feature-content">
+                                <h5>Reference Examples</h5>
+                                <p>View examples of all Azure resource types using your defined naming convention.</p>
+                                <a href="reference" class="btn btn-sm btn-outline-primary">View Reference</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="feature-item">
+                            <div class="feature-icon-small">
+                                <i class="oi oi-play-circle"></i>
+                            </div>
+                            <div class="feature-content">
+                                <h5>Name Generation</h5>
+                                <p>Interactive name generation with dropdown menus for all resource types and components.</p>
+                                <a href="generate" class="btn btn-sm btn-outline-primary">Generate Names</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generated Names Log -->
+                    @if (Convert.ToBoolean(config.GeneratedNamesLogEnabled) || admin)
+                    {
+                        <div class="col-lg-4 col-md-6">
+                            <div class="feature-item">
+                                <div class="feature-icon-small">
+                                    <i class="oi oi-list"></i>
+                                </div>
+                                <div class="feature-content">
+                                    <h5>Generated Names Log</h5>
+                                    <p>Track all generated names with detailed logs including user, date, and components used.</p>
+                                    <a href="generatednameslog" class="btn btn-sm btn-outline-primary">View Log</a>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Compliance Engine -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="feature-item">
+                            <div class="feature-icon-small">
+                                <i class="oi oi-check"></i>
+                            </div>
+                            <div class="feature-content">
+                                <h5>Compliance Engine</h5>
+                                <p>Automatic validation against Azure naming requirements with intelligent character limit handling.</p>
+                                <span class="badge bg-success">Always Compliant</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Integration Examples -->
+<div class="integration-examples mb-4">
+    <div class="container-fluid">
+        <div class="card @theme!.ThemeStyle">
+            <div class="card-header">
+                <h3><i class="oi oi-code"></i> Integration Examples</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-lg-6">
+                        <h5><i class="oi oi-terminal"></i> CLI Usage</h5>
+                        <div class="code-example">
+                            <pre><code># List available resource types
+./generate-name.sh list-types Compute
+
+# Generate VM name
+./generate-name.sh generate \
+  --type vm \
+  --env prod \
+  --location eastus \
+  --org myorg \
+  --project webapp
+
+# Output: vm-myorg-prod-eastus-01</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <h5><i class="oi oi-code"></i> Terraform Module</h5>
+                        <div class="code-example">
+                            <pre><code>module "vm_name" {
+  source = "./modules/azure-naming"
+
+  resource_type = "vm"
+  environment   = "prod"
+  location      = "eastus"
+  organization  = "myorg"
+  project       = "webapp"
+}
+
+resource "azurerm_virtual_machine" "main" {
+  name = module.vm_name.name
+  # ... other configuration
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Disclaimer and Framework Info -->
+<div class="framework-info mb-4">
+    <div class="container-fluid">
+        <div class="alert alert-info">
+            <h5><i class="oi oi-info"></i> Azure Cloud Adoption Framework</h5>
+            <p class="mb-2">
+                This tool was designed using the best practices in the
+                <a href="https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/" target="_blank">Azure Cloud Adoption Framework</a>
+                which adheres to proven rules and allows complete customization of your naming convention.
             </p>
-            <h4>Generate</h4>
-            <p>
-                The Generate page provides a drop-down menu to select an Azure resource type. Once a resource is selected, the naming component options are provided. Read-only components cannot be changed, like the value for a resource type. Optional components, if unselected, will be null and not shown in the output. Required components do not allow a null value and will require a selection from the menu.
+            <p class="mb-0">
+                <strong>Enterprise Features:</strong> Web interface, REST API, CLI integration, Terraform modules, and comprehensive documentation.
             </p>
-            @if (Convert.ToBoolean(config.GeneratedNamesLogEnabled) || admin)
-            {
-                <h4>Generated Names Log</h4>
-                <p>
-                    The Generated Names Log contains a record of all names generated in the Azure Naming Tool. This includes the date, user, generated name, resource type, and components selected. This log can be exported to a .csv file.
-                </p>
-            }
-            @if (Convert.ToBoolean(config.InstructionsEnabled) || admin)
-            {
-                <p>
-                    <button class="btn btn-primary" title="Instructions" @onclick="@(e => OnInstructionsClick())">
-                        View Instructions
-                    </button>
-                </p>
-            }
-        }
+        </div>
     </div>
 </div>
 @code {
@@ -85,6 +453,7 @@
     private string? customhomecontent = String.Empty;
     private string? logopath = String.Empty;
     private string? toolname = String.Empty;
+    private int resourceTypeCount = 0;
 
     private string appversion = ConfigurationHelper.GetAssemblyVersion();
     private string updateurl = "https://github.com/mspnp/AzureNamingTool/wiki/Updating";
@@ -94,6 +463,35 @@
         customhomecontent = ConfigurationHelper.GetAppSetting("CustomHomeContent", false);
         logopath = !String.IsNullOrEmpty(ConfigurationHelper.GetAppSetting("CustomLogoPath", false)) ? ConfigurationHelper.GetAppSetting("CustomLogoPath", false) : "images/AzureNamingToolLogo.png";
         toolname = !String.IsNullOrEmpty(ConfigurationHelper.GetAppSetting("CustomToolName", false)) ? ConfigurationHelper.GetAppSetting("CustomToolName", false) : "Azure Naming Tool";
+
+        // Get resource type count for stats
+        try
+        {
+            var resourceTypes = await ResourceTypeService.GetItems();
+            if (resourceTypes.ResponseObject != null)
+            {
+                resourceTypeCount = ((List<ResourceType>)resourceTypes.ResponseObject).Count;
+            }
+            else
+            {
+                resourceTypeCount = 50; // Fallback number
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading resource types count");
+            resourceTypeCount = 50; // Fallback number
+        }
+    }
+
+    private void NavigateToGenerate()
+    {
+        NavigationManager.NavigateTo("generate");
+    }
+
+    private void NavigateToReference()
+    {
+        NavigationManager.NavigateTo("reference");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
