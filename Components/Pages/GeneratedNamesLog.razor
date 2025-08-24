@@ -1,28 +1,32 @@
-﻿@page "/generatednameslog"
+@page "/generatednameslog"
 @using AzureNamingTool.Helpers
 @using AzureNamingTool.Models
 @using AzureNamingTool.Services
+@using AzureNamingTool.Interfaces
+@using AzureNamingTool.Components.General
 @using System.IO
 @using BlazorDownloadFile
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @using System.Text
-@inject ILogger<Configuration> Logger
+@inject ILogger<GeneratedNamesLog> Logger
 @inject IJSRuntime JsRuntime
 @inject IConfiguration _config
 @inject StateContainer state
 @inject ProtectedSessionStorage session
 @inject IToastService toastService
+@inject GeneratedNamesService GeneratedNamesService
+@inject IGeneratedNamesRepository Repository
 @implements IDisposable
 @inject NavigationManager NavigationManager
 
-<PageTitle>Azure Naming Tool - Generated Names Log</PageTitle>
-<div class="card  @theme.ThemeStyle">
+<PageTitle>Azure Naming Tool - Generated Names Audit Log</PageTitle>
+<div class="card @theme.ThemeStyle">
     <div class="card-body">
         <div style="float:left;">
             <h1>
-                Generated Names Log
+                Generated Names Audit Log
             </h1>
         </div>
         <div style="float:right;">
@@ -31,317 +35,515 @@
             </button>
         </div>
         <div style="clear:both;"></div>
-        <div class="mb-3">This page displays a log of generated resouce type names.</div>
+        <div class="mb-3">This page displays a comprehensive audit log of generated resource names with enhanced filtering and search capabilities.</div>
+
+        <!-- Enhanced Filters -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="@showFilters" aria-controls="filtersCollapse">
+                        <span class="oi oi-magnifying-glass" aria-hidden="true"></span> Filters & Search
+                    </button>
+                </h5>
+            </div>
+            <div class="collapse @(showFilters ? "show" : "")" id="filtersCollapse">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">User Filter:</label>
+                            <input @bind="filter.User" @onkeypress="OnFilterKeyPress" class="form-control" placeholder="Filter by user" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Resource Type:</label>
+                            <input @bind="filter.ResourceType" @onkeypress="OnFilterKeyPress" class="form-control" placeholder="Filter by resource type" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Resource Name:</label>
+                            <input @bind="filter.ResourceName" @onkeypress="OnFilterKeyPress" class="form-control" placeholder="Filter by resource name" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Search Term:</label>
+                            <input @bind="filter.SearchTerm" @onkeypress="OnFilterKeyPress" class="form-control" placeholder="Search all fields" />
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <label class="form-label">From Date:</label>
+                            <input @bind="fromDate" @bind:format="yyyy-MM-dd" type="date" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">To Date:</label>
+                            <input @bind="toDate" @bind:format="yyyy-MM-dd" type="date" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">IP Address:</label>
+                            <input @bind="filter.IPAddress" @onkeypress="OnFilterKeyPress" class="form-control" placeholder="Filter by IP address" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Page Size:</label>
+                            <select @bind="pageSize" @bind:after="OnPageSizeChanged" class="form-select">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <button @onclick="ApplyFilters" class="btn btn-primary me-2">
+                                <span class="oi oi-magnifying-glass" aria-hidden="true"></span> Apply Filters
+                            </button>
+                            <button @onclick="ClearFilters" class="btn btn-secondary me-2">
+                                <span class="oi oi-x" aria-hidden="true"></span> Clear Filters
+                            </button>
+                            <button @onclick="RefreshData" class="btn btn-info">
+                                <span class="oi oi-reload" aria-hidden="true"></span> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         @if (!dataLoaded)
         {
-            <div class="spinner-border blue" role="status">
-                <span class="sr-only"></span>
+            <div class="text-center">
+                <div class="spinner-border blue" role="status">
+                    <span class="sr-only"></span>
+                </div>
+                <div class="mt-2">Loading audit log...</div>
             </div>
         }
         else
         {
-            <div class="mb-3">
-                @if (lstNameRequests.Count > 0)
-                {
-                    <div class="mb-3">
-                        <button class="btn btn-primary" title="Export Generated Names Log" @onclick="@(e => OnExportLogClick())">
-                            Export Generated Names Log
-                        </button>
-                        @if (admin)
-                        {
-                            if (duplicatenamesallowed)
-                            {
-                                <button class="btn btn-danger" style="margin-left:5px;" title="Purge Generated Names Log" @onclick="@(e => OnPurgeLogClick())">
-                                    Purge Generated Names Log
-                                </button>
-                            }
-                            else
-                            {
-                                <button class="btn btn-danger" style="margin-left:5px;" title="Purge Generated Names Log" disabled>
-                                    Purge Generated Names Log
-                                </button>
-                                <div class="mt-3">
-                                    <div class="alert alert-warning">
-                                        <span class="fw-bold">NOTE</span>:
-                                        Duplicate names are not currently allowed in the site settings. Purging of the log is restricted.
-                                    </div>
-                                </div>
-                            }
-                        }
-                    </div>
-                    <div class="card mb-3">
-                        <div class="card-header bg-default text-dark">
-                            <a class="text-decoration-none text-dark" data-bs-toggle="collapse" style="display:block;font-weight:bold;" href="#filter" role="button" aria-expanded="false" aria-controls="filter">
-                                <span class="oi oi-chevron-bottom" aria-hidden="true"></span> Filter Data
-                            </a>
-                        </div>
-                        <div class="collapse show card card-body @theme.ThemeStyle" id="filter">
-                            <div class="form-group row mb-3">
-                                <div style="width:auto;">
-                                    <input class="form-control" type="date" style="width: 150px;" @bind="startdate" @bind:event="oninput" />
-                                </div>
-                                <div style="width:auto;padding-top:7px;">
-                                    to
-                                </div>
-                                <div style="width:auto;">
-                                    <input class="form-control" type="date" style="width: 150px;" @bind="enddate" @bind:event="oninput" />
-                                </div>
-                            </div>
-                            <div class="form-group row mb-3">
-                                <div class="input-group flex-nowrap">
-                                    <div class="input-group flex-nowrap">
-                                        <span class="input-group-text" id="addon-wrapping">
-                                            <span class="oi oi-magnifying-glass" id="addon-wrapping"></span>
-                                        </span>
-                                        <input class="form-control" type="search" placeholder="Filter by Created By, Generated Name, Resource Type, Components"
-                                        @bind="filterData"
-                                        @bind:event="oninput">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group row">
-                                <div>
-                                    <button class="btn btn-success" title="Reset" @onclick="@(e => OnResetClick())">
-                                        Reset
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table @theme.ThemeStyle">
-                            <thead>
-                                <tr>
-                                    @if ((admin) && (duplicatenamesallowed))
-                                    {
-                                        <th scope="col"></th>
-                                    }
-                                    <th scope="col">Created On</th>
-                                    <th scope="col">Created By</th>
-                                    <th scope="col">Generated Name</th>
-                                    <th scope="col">Resource Type</th>
-                                    <th scope="col">Components</th>
-                                    <th scope="col">Message</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (GeneratedName name in lstNameRequests)
-                                {
-                                    if (!IsVisible(name))
-                                        continue;
-                                    <tr>
-                                        @if ((admin) && (duplicatenamesallowed))
-                                        {
-                                            <td class="align-top">
-                                                <button type="button" class="btn btn-danger" @onclick="@(e => DeleteGeneratedName(name.Id))" title="Delete">
-                                                    <span class="oi oi-x" aria-hidden="true"></span>
-                                                </button>
-                                            </td>
-                                        }
-                                        <td class="align-top">
-                                            @name.CreatedOn.ToString()
-                                        </td>
-                                        <td class="align-top">
-                                            @name.User
-                                        </td>
-                                        <td class="align-top">
-                                            @name.ResourceName
-                                        </td>
-                                        <td class="align-top">
-                                            @if (GeneralHelper.IsNotNull(name.ResourceTypeName))
-                                            {
-                                                @name.ResourceTypeName
-                                            }
-                                        </td>
-                                        <td class="align-top">
-                                            <div>
-                                                @foreach (string[] component in name.Components.ToList<string[]>())
-                                                {
-                                                    <div style="line-break:anywhere;">
-                                                        @component[0] : @component[1]
-                                                    </div>
-                                                }
-                                            </div>
-                                        </td>
-                                        <td class="align-top">
-                                            <div>
-                                                @name.Message
-                                            </div>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-                else
-                {
-                    <p style="font-style:italic">
-                        There are no log items to display.
-                    </p>
-                }
-            </div>
-        }
-    </div>
-</div>
-
-@code {
-    [CascadingParameter]
-    protected ThemeInfo theme { get; set; } = new();
-    [CascadingParameter]
-    public IModalService? Modal { get; set; }
-    private bool admin = false;
-    private bool dataLoaded = false;
-    private bool duplicatenamesallowed = false;
-    List<GeneratedName> lstNameRequests = new();
-    public string filterData { get; set; } = String.Empty;
-    public DateTime startdate { get; set; } = DateTime.Today.AddDays(-30);
-    public DateTime enddate { get; set; } = DateTime.Today;
-    private string currentuser = String.Empty;
-    private SiteConfiguration config = ConfigurationHelper.GetConfigurationData();
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        currentuser = await IdentityHelper.GetCurrentUser(session);
-        if (firstRender)
-        {
-            var result = await session.GetAsync<bool>("admin");
-            admin = (bool)result.Value;
-            if (!Convert.ToBoolean(config.GeneratedNamesLogEnabled) && !admin)
-            {
-                toastService.ShowWarning("The Generated Names Log is disabled in the site settings.");
-                NavigationManager.NavigateTo("");
-            }
-            await LoadData();
-            duplicatenamesallowed = Convert.ToBoolean(ConfigurationHelper.GetAppSetting("DuplicateNamesAllowed"));
-            StateHasChanged();
-        }
-    }
-
-    private async Task LoadData()
-    {
-        ServiceResponse serviceResponse = new();
-        serviceResponse = await GeneratedNamesService.GetItems();
-        if (serviceResponse.Success)
-        {
-            if (GeneralHelper.IsNotNull(serviceResponse.ResponseObject))
-            {
-                lstNameRequests = (List<GeneratedName>)serviceResponse.ResponseObject!;
-                dataLoaded = true;
-            }
-        }
-        StateHasChanged();
-    }
-
-
-    private void OnInstructionsClick()
-    {
-        NavigationManager.NavigateTo("instructions");
-    }
-
-
-    public void Dispose()
-    {
-        StateHasChanged();
-    }
-
-    private async Task DeleteGeneratedName(long id)
-    {
-        ServiceResponse serviceResponse = new();
-        ResponseMessage message = new();
-        bool confirm = false;
-        confirm = await ModalHelper.ShowConfirmationModal(Modal!, "ATTENTION", "<div class=\"my-4\">This will delete the Generated Name and cannot be undone!</div><div class=\"my-4\">Are you sure?</div>", "bg-danger", theme);
-        if (confirm)
-        {
-            serviceResponse = await GeneratedNamesService.GetItem(Convert.ToInt32(id));
-            if (serviceResponse.Success)
-            {
-                if (GeneralHelper.IsNotNull(serviceResponse.ResponseObject))
-                {
-                    GeneratedName generatedname = (GeneratedName)serviceResponse.ResponseObject!;
-                    if (GeneralHelper.IsNotNull(generatedname))
+            <!-- Results Summary and Actions -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    @if (pagedResult != null)
                     {
-                        serviceResponse = await GeneratedNamesService.DeleteItem(Convert.ToInt32(generatedname.Id));
-                        if (serviceResponse.Success)
+                        <div class="alert alert-info">
+                            <strong>Results:</strong> Showing @pagedResult.StartItem - @pagedResult.EndItem of @pagedResult.TotalCount total records
+                            @if (filter.HasFilters)
+                            {
+                                <span class="badge bg-warning ms-2">Filtered</span>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="col-md-6 text-end">
+                    @if (pagedResult != null && pagedResult.TotalCount > 0)
+                    {
+                        <button class="btn btn-primary me-2" title="Export Current Results" @onclick="OnExportFilteredClick">
+                            <span class="oi oi-data-transfer-download" aria-hidden="true"></span> Export Results
+                        </button>
+                        <button class="btn btn-secondary me-2" title="Export All Data" @onclick="OnExportAllClick">
+                            <span class="oi oi-data-transfer-download" aria-hidden="true"></span> Export All
+                        </button>
+                        @if (admin && duplicatenamesallowed)
                         {
-                            message.Type = MessageTypesEnum.SUCCESS;
-                            message.Message = "Generated name deleted!";
-                            toastService.ShowSuccess(message.Message);
-                            AdminLogService.PostItem(new AdminLogMessage() { Source = currentuser, Title = "INFORMATION", Message = "Generated Name (" + generatedname.ResourceName + ") deleted." });
-                            CacheHelper.InvalidateCacheObject("GeneratedName");
-                            await LoadData();
-                            state.SetNavReload(true);
-                        }
-                        else
-                        {
-                            message.Type = MessageTypesEnum.ERROR;
-                            message.Message = "Generated name deletion failed!";
-                            message.MessageDetails = serviceResponse.ResponseMessage;
-                            toastService.ShowError(message.Message);
+                            <button class="btn btn-danger" title="Purge Generated Names Log" @onclick="OnPurgeLogClick">
+                                <span class="oi oi-trash" aria-hidden="true"></span> Purge Log
+                            </button>
                         }
                     }
-                }
-                else
+                </div>
+            </div>
+
+            @if (pagedResult != null && pagedResult.TotalCount > 0)
+            {
+                <!-- Enhanced Table with additional audit fields -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Created On</th>
+                                <th>User</th>
+                                <th>Resource Name</th>
+                                <th>Resource Type</th>
+                                <th>Components</th>
+                                <th>IP Address</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var name in pagedResult.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <small>@name.CreatedOn.ToString("yyyy-MM-dd")</small><br/>
+                                        <small class="text-muted">@name.CreatedOn.ToString("HH:mm:ss")</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">@name.User</span>
+                                    </td>
+                                    <td>
+                                        <strong>@name.ResourceName</strong>
+                                        @if (!string.IsNullOrEmpty(name.Message))
+                                        {
+                                            <br/><small class="text-muted">@name.Message</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">@name.ResourceTypeName</span>
+                                    </td>
+                                    <td>
+                                        @foreach (var component in name.Components)
+                                        {
+                                            <span class="badge bg-info me-1 mb-1">@component[0]: @component[1]</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">N/A</small>
+                                    </td>
+                                    <td>
+                                        <button @onclick="() => ViewDetails(name)" class="btn btn-sm btn-outline-info" title="View Details">
+                                            <span class="oi oi-eye" aria-hidden="true"></span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                @if (pagedResult.TotalPages > 1)
                 {
-                    message.Type = MessageTypesEnum.ERROR;
-                    message.Message = "Generated name deletion failed!";
-                    message.MessageDetails = serviceResponse.ResponseMessage;
-                    toastService.ShowError(message.Message);
+                    <nav aria-label="Generated names pagination">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item @(pagedResult.HasPreviousPage ? "" : "disabled")">
+                                <button @onclick="() => LoadPage(currentPage - 1)" class="page-link" disabled="@(!pagedResult.HasPreviousPage)">
+                                    <span class="oi oi-chevron-left" aria-hidden="true"></span> Previous
+                                </button>
+                            </li>
+                            
+                            @for (int i = Math.Max(1, currentPage - 2); i <= Math.Min(pagedResult.TotalPages, currentPage + 2); i++)
+                            {
+                                <li class="page-item @(i == currentPage ? "active" : "")">
+                                    <button @onclick="() => LoadPage(i)" class="page-link">@i</button>
+                                </li>
+                            }
+                            
+                            <li class="page-item @(pagedResult.HasNextPage ? "" : "disabled")">
+                                <button @onclick="() => LoadPage(currentPage + 1)" class="page-link" disabled="@(!pagedResult.HasNextPage)">
+                                    Next <span class="oi oi-chevron-right" aria-hidden="true"></span>
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            Page @currentPage of @pagedResult.TotalPages (@pagedResult.TotalCount total records)
+                        </small>
+                    </div>
                 }
             }
             else
             {
-                message.Type = MessageTypesEnum.ERROR;
-                message.Message = "Generated name deletion failed!";
-                message.MessageDetails = serviceResponse.ResponseMessage;
-                toastService.ShowError(message.Message);
+                <div class="alert alert-warning text-center">
+                    <h5>No Records Found</h5>
+                    <p>No generated names match your current filter criteria.</p>
+                    @if (filter.HasFilters)
+                    {
+                        <button @onclick="ClearFilters" class="btn btn-primary">
+                            <span class="oi oi-x" aria-hidden="true"></span> Clear Filters
+                        </button>
+                    }
+                </div>
             }
+        }
+    </div>
+</div>
+
+<Blazored.Modal.BlazoredModal />
+
+@code {
+    [CascadingParameter]
+    protected ThemeInfo? theme { get; set; }
+    [CascadingParameter]
+    public IModalService Modal { get; set; } = default!;
+
+    private bool dataLoaded = false;
+    private bool admin = false;
+    private bool duplicatenamesallowed = false;
+    private bool showFilters = true;
+
+    private PagedResult<GeneratedName>? pagedResult;
+    private GeneratedNameFilter filter = new();
+    private GeneratedName? selectedName;
+
+    private int currentPage = 1;
+    private int pageSize = 25;
+
+    private DateTime? fromDate;
+    private DateTime? toDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Logger.LogInformation("Initializing Generated Names Log page");
+
+            // Check admin status
+            try
+            {
+                var adminresult = await session.GetAsync<bool>("admin");
+                admin = adminresult.Success ? adminresult.Value : false;
+                Logger.LogInformation("Admin status: {IsAdmin}", admin);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to get admin status, defaulting to false");
+                admin = false;
+            }
+
+            // Check if duplicate names are allowed
+            try
+            {
+                duplicatenamesallowed = Convert.ToBoolean(ConfigurationHelper.GetAppSetting("DuplicateNamesAllowed"));
+                Logger.LogInformation("Duplicate names allowed: {DuplicateNamesAllowed}", duplicatenamesallowed);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to get duplicate names setting, defaulting to false");
+                duplicatenamesallowed = false;
+            }
+
+            // Load initial data
+            Logger.LogInformation("Loading initial data for Generated Names Log");
+            await LoadPage(1);
+            Logger.LogInformation("Generated Names Log initialization completed");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error initializing Generated Names Log page");
+            toastService.ShowError("Error loading page: " + ex.Message);
+            dataLoaded = true; // Set to true to stop loading spinner
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPage(int page)
+    {
+        try
+        {
+            Logger.LogInformation("Loading page {Page} with page size {PageSize}", page, pageSize);
+            dataLoaded = false;
+            currentPage = page;
+
+            // Update filter dates
+            UpdateFilterDates();
+            Logger.LogInformation("Filter updated - FromDate: {FromDate}, ToDate: {ToDate}", filter.FromDate, filter.ToDate);
+
+            // Try to load from database first
+            try
+            {
+                Logger.LogInformation("Attempting to load data from database");
+                var serviceResponse = await GeneratedNamesService.GetPagedItems(page, pageSize, filter);
+
+                if (serviceResponse.Success && serviceResponse.ResponseObject != null)
+                {
+                    Logger.LogInformation("Successfully loaded data from database");
+                    var result = serviceResponse.ResponseObject as dynamic;
+                    pagedResult = new PagedResult<GeneratedName>
+                    {
+                        Items = result.Items,
+                        TotalCount = result.TotalCount,
+                        Page = result.Page,
+                        PageSize = result.PageSize
+                    };
+                    Logger.LogInformation("Loaded {ItemCount} items out of {TotalCount} total",
+                        pagedResult.Items?.Count() ?? 0, pagedResult.TotalCount);
+                }
+                else
+                {
+                    Logger.LogWarning("Database method failed or returned no data, falling back to legacy method");
+                    await LoadLegacyData();
+                }
+            }
+            catch (Exception dbEx)
+            {
+                Logger.LogError(dbEx, "Database loading failed, falling back to legacy method");
+                await LoadLegacyData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading page {Page}", page);
+            toastService.ShowError("Error loading data: " + ex.Message);
+
+            // Initialize empty result to prevent further errors
+            pagedResult = new PagedResult<GeneratedName>
+            {
+                Items = new List<GeneratedName>(),
+                TotalCount = 0,
+                Page = page,
+                PageSize = pageSize
+            };
+        }
+        finally
+        {
+            dataLoaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadLegacyData()
+    {
+        try
+        {
+            var serviceResponse = await GeneratedNamesService.GetItems();
+            if (serviceResponse.Success && serviceResponse.ResponseObject != null)
+            {
+                var allItems = (List<GeneratedName>)serviceResponse.ResponseObject;
+
+                // Apply basic filtering
+                var filteredItems = allItems.AsQueryable();
+
+                if (!string.IsNullOrEmpty(filter.User))
+                    filteredItems = filteredItems.Where(x => x.User.Contains(filter.User, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(filter.ResourceType))
+                    filteredItems = filteredItems.Where(x => x.ResourceTypeName.Contains(filter.ResourceType, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(filter.ResourceName))
+                    filteredItems = filteredItems.Where(x => x.ResourceName.Contains(filter.ResourceName, StringComparison.OrdinalIgnoreCase));
+
+                if (filter.FromDate.HasValue)
+                    filteredItems = filteredItems.Where(x => x.CreatedOn >= filter.FromDate.Value);
+
+                if (filter.ToDate.HasValue)
+                    filteredItems = filteredItems.Where(x => x.CreatedOn <= filter.ToDate.Value);
+
+                var totalCount = filteredItems.Count();
+                var items = filteredItems
+                    .OrderByDescending(x => x.CreatedOn)
+                    .Skip((currentPage - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                pagedResult = new PagedResult<GeneratedName>
+                {
+                    Items = items,
+                    TotalCount = totalCount,
+                    Page = currentPage,
+                    PageSize = pageSize
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading legacy data");
+            pagedResult = new PagedResult<GeneratedName>();
+        }
+    }
+
+    private void UpdateFilterDates()
+    {
+        filter.FromDate = fromDate;
+        filter.ToDate = toDate?.AddDays(1).AddSeconds(-1); // End of day
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadPage(1);
+    }
+
+    private async Task ClearFilters()
+    {
+        filter = new GeneratedNameFilter();
+        fromDate = null;
+        toDate = null;
+        await LoadPage(1);
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadPage(currentPage);
+    }
+
+    private async Task OnPageSizeChanged()
+    {
+        await LoadPage(1);
+    }
+
+    private async Task OnFilterKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplyFilters();
+        }
+    }
+
+    private async Task ViewDetails(GeneratedName name)
+    {
+        selectedName = name;
+        await JsRuntime.InvokeVoidAsync("bootstrap.Modal.getOrCreateInstance", "#detailsModal").AsTask();
+        await JsRuntime.InvokeVoidAsync("bootstrap.Modal.show", "#detailsModal").AsTask();
+    }
+
+    private async Task OnExportFilteredClick()
+    {
+        try
+        {
+            if (pagedResult?.Items != null)
+            {
+                var jsonData = JsonSerializer.Serialize(pagedResult.Items, new JsonSerializerOptions { WriteIndented = true });
+                var fileName = $"generated-names-filtered-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+                await JsRuntime.InvokeVoidAsync("downloadFile", fileName, "application/json", jsonData);
+                toastService.ShowSuccess("Filtered results exported successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exporting filtered results");
+            toastService.ShowError("Error exporting data: " + ex.Message);
+        }
+    }
+
+    private async Task OnExportAllClick()
+    {
+        try
+        {
+            var serviceResponse = await GeneratedNamesService.GetItems();
+            if (serviceResponse.Success && serviceResponse.ResponseObject != null)
+            {
+                var allItems = (List<GeneratedName>)serviceResponse.ResponseObject;
+                var jsonData = JsonSerializer.Serialize(allItems, new JsonSerializerOptions { WriteIndented = true });
+                var fileName = $"generated-names-all-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+                await JsRuntime.InvokeVoidAsync("downloadFile", fileName, "application/json", jsonData);
+                toastService.ShowSuccess("All data exported successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exporting all data");
+            toastService.ShowError("Error exporting data: " + ex.Message);
         }
     }
 
     private async Task OnPurgeLogClick()
     {
-        ServiceResponse serviceResponse = new();
-
-        bool confirm = false;
-        confirm = await ModalHelper.ShowConfirmationModal(Modal!, "ATTENTION", "<div class=\"my-4\">This will purge the Generated Names Log and cannot be undone!</div><div class=\"my-4\">Are you sure?</div>", "bg-danger", theme);
-        if (confirm)
+        try
         {
-            await LogHelper.PurgeGeneratedNames();
-            toastService.ShowSuccess("Generated Names Log purged!");
-            AdminLogService.PostItem(new AdminLogMessage() { Source = currentuser, Title = "INFORMATION", Message = "Generated Names log purged." });
-            await LoadData();
-            StateHasChanged();
+            var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to purge all generated names? This action cannot be undone.");
+            if (confirmed)
+            {
+                // Implementation would depend on whether using database or file storage
+                toastService.ShowInfo("Purge functionality not yet implemented");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error purging log");
+            toastService.ShowError("Error purging log: " + ex.Message);
         }
     }
 
-    private async Task OnExportLogClick()
+    public void Dispose()
     {
-        await JsRuntime.InvokeVoidAsync("htmlToCSV", "generatednameslog.csv");
-    }
-
-    public bool IsVisible(GeneratedName name)
-    {
-        bool visible = true;
-        if (name.CreatedOn < startdate)
-            visible = false;
-
-        if (name.CreatedOn > (enddate + new TimeSpan(23, 59, 59)))
-            visible = false;
-
-        if (!string.IsNullOrEmpty(filterData))
-        {
-            if ((!name.User.Contains(filterData, StringComparison.OrdinalIgnoreCase)) && (!name.ResourceName.Contains(filterData, StringComparison.OrdinalIgnoreCase)) && (!name.ResourceTypeName.Contains(filterData, StringComparison.OrdinalIgnoreCase)) && (!string.Join(",", name.Components).Contains(filterData, StringComparison.OrdinalIgnoreCase)))
-                visible = false;
-        }
-        return visible;
-    }
-
-    private void OnResetClick()
-    {
-        startdate = DateTime.Today.AddDays(-30);
-        enddate = DateTime.Today;
-        filterData = "";
+        // Cleanup if needed
     }
 }
