@@ -24,6 +24,12 @@ namespace AzureNamingTool.Controllers
     public class ResourceNamingRequestsController : ControllerBase
     {
         private ServiceResponse serviceResponse = new();
+        private readonly ResourceNamingRequestService _resourceNamingRequestService;
+
+        public ResourceNamingRequestsController(ResourceNamingRequestService resourceNamingRequestService)
+        {
+            _resourceNamingRequestService = resourceNamingRequestService;
+        }
         // POST api/<ResourceNamingRequestsController>
         /// <summary>
         /// This function will generate a resource type name for specified component values. This function requires full definition for all components. It is recommended to use the RequestName API function for name generation.
@@ -36,7 +42,7 @@ namespace AzureNamingTool.Controllers
         {
             try
             {
-                ResourceNameResponse resourceNameRequestResponse = await ResourceNamingRequestService.RequestNameWithComponents(request);
+                ResourceNameResponse resourceNameRequestResponse = await _resourceNamingRequestService.RequestNameWithComponentsAsync(request);
                 if (resourceNameRequestResponse.Success)
                 {
                     return Ok(resourceNameRequestResponse);
@@ -66,7 +72,7 @@ namespace AzureNamingTool.Controllers
             try
             {
                 request.CreatedBy = "API";
-                ResourceNameResponse resourceNameRequestResponse = await ResourceNamingRequestService.RequestName(request);
+                ResourceNameResponse resourceNameRequestResponse = await _resourceNamingRequestService.RequestNameAsync(request);
                 if (resourceNameRequestResponse.Success)
                 {
                     return Ok(resourceNameRequestResponse);

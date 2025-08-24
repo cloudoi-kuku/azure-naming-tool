@@ -18,12 +18,30 @@ namespace AzureNamingTool.Services
     /// </summary>
     public class ResourceNamingRequestService
     {
+        private readonly GeneratedNamesService? _generatedNamesService;
+
         /// <summary>
-        /// This function will generate a resoure type name for specifed component values. This function requires full definition for all components. It is recommended to use the ResourceNameRequest API function for name generation.   
+        /// Initializes a new instance of the <see cref="ResourceNamingRequestService"/> class for dependency injection.
+        /// </summary>
+        /// <param name="generatedNamesService">The generated names service.</param>
+        public ResourceNamingRequestService(GeneratedNamesService generatedNamesService)
+        {
+            _generatedNamesService = generatedNamesService;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ResourceNamingRequestService"/> class for static usage (backward compatibility).
+        /// </summary>
+        public ResourceNamingRequestService()
+        {
+            _generatedNamesService = null;
+        }
+        /// <summary>
+        /// This function will generate a resoure type name for specifed component values. This function requires full definition for all components. It is recommended to use the ResourceNameRequest API function for name generation.
         /// </summary>
         /// <param name="request"></param>
         /// <returns>ResourceNameResponse - Response of name generation</returns>
-        public static async Task<ResourceNameResponse> RequestNameWithComponents(ResourceNameRequestWithComponents request)
+        public async Task<ResourceNameResponse> RequestNameWithComponentsAsync(ResourceNameRequestWithComponents request)
         {
             ServiceResponse serviceResponse = new();
             ResourceNameResponse response = new()
@@ -214,7 +232,17 @@ namespace AzureNamingTool.Services
                         ResourceName = name,
                         Components = lstComponents
                     };
-                    await GeneratedNamesService.PostItem(generatedName);
+
+                    // Use injected service if available, otherwise fall back to static method
+                    if (_generatedNamesService != null)
+                    {
+                        await _generatedNamesService.PostItemAsync(generatedName);
+                    }
+                    else
+                    {
+                        await GeneratedNamesService.PostItem(generatedName);
+                    }
+
                     response.Success = true;
                     response.ResourceName = name;
                     response.Message = sbMessage.ToString();
@@ -236,11 +264,22 @@ namespace AzureNamingTool.Services
         }
 
         /// <summary>
-        /// This function is used to generate a name by providing each component and the short name value. The function will validate the values to ensure they match the current configuration. 
+        /// Static method for backward compatibility.
         /// </summary>
         /// <param name="request"></param>
         /// <returns>ResourceNameResponse - Response of name generation</returns>
-        public static async Task<ResourceNameResponse> RequestName(ResourceNameRequest request)
+        public static async Task<ResourceNameResponse> RequestNameWithComponents(ResourceNameRequestWithComponents request)
+        {
+            var service = new ResourceNamingRequestService();
+            return await service.RequestNameWithComponentsAsync(request);
+        }
+
+        /// <summary>
+        /// This function is used to generate a name by providing each component and the short name value. The function will validate the values to ensure they match the current configuration.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns>ResourceNameResponse - Response of name generation</returns>
+        public async Task<ResourceNameResponse> RequestNameAsync(ResourceNameRequest request)
         {
             ResourceNameResponse resourceNameResponse = new()
             {
@@ -864,7 +903,18 @@ namespace AzureNamingTool.Services
                             generatedName.ResourceTypeName += " - " + resourceType.Property;
                         }
 
-                        ServiceResponse responseGenerateName = await GeneratedNamesService.PostItem(generatedName);
+                        ServiceResponse responseGenerateName;
+
+                        // Use injected service if available, otherwise fall back to static method
+                        if (_generatedNamesService != null)
+                        {
+                            responseGenerateName = await _generatedNamesService.PostItemAsync(generatedName);
+                        }
+                        else
+                        {
+                            responseGenerateName = await GeneratedNamesService.PostItem(generatedName);
+                        }
+
                         if (responseGenerateName.Success)
                         {
                             resourceNameResponse.Success = true;
@@ -908,6 +958,17 @@ namespace AzureNamingTool.Services
                 resourceNameResponse.Message = ex.Message;
                 return resourceNameResponse;
             }
+        }
+
+        /// <summary>
+        /// Static method for backward compatibility.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns>ResourceNameResponse - Response of name generation</returns>
+        public static async Task<ResourceNameResponse> RequestName(ResourceNameRequest request)
+        {
+            var service = new ResourceNamingRequestService();
+            return await service.RequestNameAsync(request);
         }
     }
 }

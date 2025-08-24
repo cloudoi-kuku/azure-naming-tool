@@ -35,6 +35,15 @@ builder.Services.AddBlazoredToast();
 builder.Services.AddBlazoredModal();
 builder.Services.AddHttpContextAccessor();
 
+// Add session services
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 builder.Services.AddSingleton<StateContainer>();
 
 // Database configuration
@@ -58,6 +67,7 @@ builder.Services.AddScoped<IGeneratedNamesRepository, GeneratedNamesRepository>(
 
 // Service registration
 builder.Services.AddScoped<GeneratedNamesService>();
+builder.Services.AddScoped<ResourceNamingRequestService>();
 
 // Migration service for data migration
 builder.Services.AddScoped<IDataMigrationService, DataMigrationService>();
@@ -167,6 +177,7 @@ app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "AzureNaming
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+app.UseSession();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
