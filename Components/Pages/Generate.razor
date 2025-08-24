@@ -11,6 +11,7 @@
 @inject ProtectedSessionStorage session
 @inject IJSRuntime JsRuntime
 @inject IToastService toastService
+@inject ResourceNamingRequestService ResourceNamingRequestService
 
 <PageTitle>Azure Naming Tool - Generate</PageTitle>
 <div class="card @theme.ThemeStyle">
@@ -728,7 +729,7 @@
                     {
                         resourceNameRequest.ResourceType = resourceType.ShortName;
                         resourceNameRequest.ResourceId = resourceType.Id;
-                        resourceNameRequestResponse = await ResourceNamingRequestService.RequestName(resourceNameRequest);
+                        resourceNameRequestResponse = await ResourceNamingRequestService.RequestNameAsync(resourceNameRequest);
                         namerequested = true;
 
                         // Prepare the response
@@ -776,7 +777,7 @@
                         {
                             resourceNameRequest.ResourceType = resourceType.ShortName;
                             resourceNameRequest.ResourceId = resourceType.Id;
-                            resourceNameRequestResponse = await ResourceNamingRequestService.RequestName(resourceNameRequest);
+                            resourceNameRequestResponse = await ResourceNamingRequestService.RequestNameAsync(resourceNameRequest);
 
                             sbNames.Append("<tr>");
                             if (!String.IsNullOrEmpty(resourceType.Property))
