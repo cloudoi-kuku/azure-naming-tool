@@ -44,6 +44,35 @@ services:
       retries: 3
       start_period: 40s
 
+  # CLI wrapper for command-line access
+  naming-cli:
+    image: curlimages/curl:latest
+    container_name: azure-naming-cli
+    depends_on:
+      - azurenamingtool
+    profiles:
+      - cli
+    entrypoint: |
+      sh -c '
+      echo "Azure Naming Tool CLI"
+      echo "Usage: docker-compose run --rm naming-cli [environment] [location] [org] [project] [resource-type]"
+      echo "Example: docker-compose run --rm naming-cli prod eastus contoso web vm"
+      if [ $$# -eq 5 ]; then
+        curl -s -X POST "http://azure-naming-tool/api/ResourceNamingRequests/RequestName" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"ResourceEnvironment\": \"$$1\",
+            \"ResourceLocation\": \"$$2\",
+            \"ResourceOrg\": \"$$3\",
+            \"ResourceProjAppSvc\": \"$$4\",
+            \"ResourceType\": \"$$5\",
+            \"CreatedBy\": \"cli\"
+          }" | jq -r ".resourceName // .message"
+      fi
+      '
+    networks:
+      - default
+
 volumes:
   azure-naming-tool-data:
     driver: local
